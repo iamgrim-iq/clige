@@ -420,7 +420,7 @@
 
 *   **Пример использования:**
     ```javascript
-    const clige = require('clige');
+    const clige = require('./clige');
 
     // Вместо const { COLORS } = require('./core/colors');
     console.log(clige.COLORS.GREEN + 'Привет, Clige!' + clige.COLORS.RESET);
