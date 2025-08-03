@@ -1,4 +1,4 @@
-# Clige: TUI-движок для командной строки на Node.js
+# Clige 0.1.0: TUI-движок для командной строки на Node.js
 
 ![Clige Logo Placeholder](https://dummyimage.com/600x400/000/fff.jpg&text=CLI+Grim+Engine)
 
