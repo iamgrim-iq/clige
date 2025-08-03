@@ -21,13 +21,17 @@ function drawBox(content, options = {}) {
     const boxWidth = width || Math.min(maxWidth, 80);
     const border = createBorder(borderStyle);
 
-    const contentWidth = boxWidth - 2 - (padding * 2);
+    let contentWidth = boxWidth - 2 - (padding * 2);
+    if (contentWidth < 0) {
+        contentWidth = 0;
+    }
 
     const contentLines = content.split('\n');
     let wrappedLines = [];
     contentLines.forEach(line => {
-        const strippedLine = stripAnsi(line);
-        if (strippedLine.length > contentWidth) {
+
+        const { width: lineWidth } = measureText(line);
+        if (contentWidth > 0 && lineWidth > contentWidth) {
             wrappedLines.push(...wrapText(line, contentWidth));
         } else {
             wrappedLines.push(line);
@@ -47,32 +51,48 @@ function drawBox(content, options = {}) {
 
     let topBorder = '';
     if (title) {
-        const titleContent = ` ${title} `;
-        const titleWidth = stripAnsi(titleContent).length;
-        const remainingWidth = boxWidth - titleWidth - 2;
+        const { width: titleWidth } = measureText(` ${title} `);
+        const remainingWidth = Math.max(0, boxWidth - titleWidth - 2);
 
         if (titleAlign === 'center') {
             const leftPad = Math.floor(remainingWidth / 2);
             const rightPad = remainingWidth - leftPad;
-            topBorder = border.topLeft + repeat(border.horizontal, leftPad) + titleContent + repeat(border.horizontal, rightPad) + border.topRight;
+            topBorder = border.topLeft + repeat(border.horizontal, leftPad) + ` ${title} ` + fullColor + repeat(border.horizontal, rightPad) + border.topRight;
         } else if (titleAlign === 'right') {
-            topBorder = border.topLeft + repeat(border.horizontal, remainingWidth) + titleContent + border.topRight;
+            topBorder = border.topLeft + repeat(border.horizontal, remainingWidth) + ` ${title} ` + fullColor + border.topRight;
         } else {
-            topBorder = border.topLeft + titleContent + repeat(border.horizontal, remainingWidth) + border.topRight;
+            topBorder = border.topLeft + ` ${title} ` + fullColor + repeat(border.horizontal, remainingWidth) + border.topRight;
         }
     } else {
         topBorder = border.topLeft + repeat(border.horizontal, boxWidth - 2) + border.topRight;
     }
     lines.push(topBorder);
 
+    const paddingStr = repeat(' ', padding);
     const emptyLine = border.vertical + repeat(' ', boxWidth - 2) + border.vertical;
     for (let i = 0; i < padding; i++) {
         lines.push(emptyLine);
     }
 
     wrappedLines.forEach(line => {
-        const paddedLine = pad(line, contentWidth, ' ', align);
-        const contentRow = border.vertical + repeat(' ', padding) + paddedLine + repeat(' ', padding) + border.vertical;
+        const leftPart = border.vertical + paddingStr;
+        const rightPart = paddingStr + border.vertical;
+
+        const { width: visibleContentWidth } = measureText(line);
+
+        const paddingNeeded = Math.max(0, contentWidth - visibleContentWidth);
+
+        let contentRow;
+        if (align === 'right') {
+            contentRow = leftPart + repeat(' ', paddingNeeded) + line + fullColor + rightPart;
+        } else if (align === 'center') {
+            const leftPad = Math.floor(paddingNeeded / 2);
+            const rightPad = paddingNeeded - leftPad;
+            contentRow = leftPart + repeat(' ', leftPad) + line + fullColor + repeat(' ', rightPad) + rightPart;
+        } else { 
+
+            contentRow = leftPart + line + fullColor + repeat(' ', paddingNeeded) + rightPart;
+        }
         lines.push(contentRow);
     });
 
@@ -99,9 +119,9 @@ function drawContainer(items, options = {}) {
         color = COLORS.CYAN,
         containerPadding = 0
     } = options;
-    
+
     let result = '';
-    
+
     if (title) {
         result += drawBox(title, { 
             color: color + COLORS.BOLD,
@@ -110,39 +130,46 @@ function drawContainer(items, options = {}) {
         });
         result += '\n'.repeat(spacing);
     }
-    
+
     if (layout === 'horizontal') {
         const terminal = getTerminalSize();
         const totalSpacing = (items.length - 1) * spacing;
         const availableWidth = terminal.width - totalSpacing;
         const itemWidth = Math.floor(availableWidth / items.length);
-        
+
         const renderedItems = items.map(item => 
             drawBox(item.content, {
                 ...item,
-                width: itemWidth - 2 
-            })
+                width: itemWidth
+            }).split('\n')
         );
-        
-        const maxHeight = Math.max(...renderedItems.map(item => item.split('\n').length));
-        
-        for (let lineIndex = 0; lineIndex < maxHeight; lineIndex++) {
-            let line = '';
-            renderedItems.forEach((item, itemIndex) => {
-                const itemLines = item.split('\n');
-                const actualItemWidth = stripAnsi(itemLines[0] || '').length;
-                const currentLine = itemLines[lineIndex] || repeat(' ', actualItemWidth);
-                
-                const paddingNeeded = actualItemWidth - stripAnsi(currentLine).length;
-                line += currentLine + repeat(' ', paddingNeeded);
 
-                if (itemIndex < renderedItems.length - 1) {
-                    line += repeat(' ', spacing);
+        const maxHeight = Math.max(...renderedItems.map(itemLines => itemLines.length));
+
+        for (let lineIndex = 0; lineIndex < maxHeight; lineIndex++) {
+            let combinedLine = '';
+            renderedItems.forEach((itemLines, itemIndex) => {
+                const boxWidth = stripAnsi(itemLines[0] || '').length;
+                let currentLine = itemLines[lineIndex];
+
+                if (currentLine === undefined) {
+                    const boxColor = items[itemIndex].color || color || '';
+                    const background = items[itemIndex].background || '';
+                    currentLine = (boxColor + background) + repeat(' ', boxWidth) + COLORS.RESET;
+                }
+
+                combinedLine += currentLine;
+
+                if (itemIndex < items.length - 1) {
+                    combinedLine += repeat(' ', spacing);
                 }
             });
-            result += line + '\n';
+            result += combinedLine + '\n';
         }
-    } else {
+
+        result = result.slice(0, -1);
+
+    } else { 
         items.forEach((item, index) => {
             result += drawBox(item.content, {
                 title: item.title || '',
@@ -152,13 +179,13 @@ function drawContainer(items, options = {}) {
                 borderStyle: item.borderStyle,
                 align: item.align
             });
-            
+
             if (index < items.length - 1) {
                 result += '\n'.repeat(spacing);
             }
         });
     }
-    
+
     if (containerPadding > 0) {
         const paddingLine = repeat(' ', containerPadding);
         const lines = result.split('\n');
@@ -166,7 +193,7 @@ function drawContainer(items, options = {}) {
                  lines.map(line => paddingLine + line + paddingLine).join('\n') + 
                  '\n'.repeat(containerPadding) + paddingLine;
     }
-    
+
     return result;
 }
 
