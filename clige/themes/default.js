@@ -96,31 +96,32 @@ const defaultTheme = {
     }
 };
 
-function applyTheme(theme = defaultTheme) {
-    return {
-        get: (path) => {
-            const keys = path.split('.');
-            let value = theme;
-            
-            for (const key of keys) {
-                value = value[key];
-                if (value === undefined) return '';
-            }
-            
-            return value;
-        },
-        
-        colorize: (text, colorPath) => {
-            const color = theme.get ? theme.get(colorPath) : colorPath;
-            return color + text + COLORS.RESET;
-        },
-        
-        style: (text, stylePath) => {
-            const style = theme.get ? theme.get(`styles.${stylePath}`) : stylePath;
-            return style + text + COLORS.RESET;
+function applyTheme(source = defaultTheme) {
+    const wrapper = {};
+
+    wrapper.get = (path = '') => {
+        const keys = path.split('.');
+        let val = source;
+        for (const k of keys) {
+            val = val?.[k];
+            if (val === undefined) return '';
         }
+        return val;
     };
+
+    wrapper.colorize = (text, colorPath) => {
+        const code = wrapper.get(colorPath) || '';
+        return code + text + COLORS.RESET;
+    };
+
+    wrapper.style = (text, stylePath) => {
+        const code = wrapper.get(`styles.${stylePath}`) || '';
+        return code + text + COLORS.RESET;
+    };
+
+    return wrapper;
 }
+
 
 module.exports = {
     defaultTheme,
