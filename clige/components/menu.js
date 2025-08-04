@@ -77,94 +77,89 @@ function drawMenu(items, options = {}) {
     });
 }
 
-function createInteractiveMenu(items, options = {}) {
+function createInteractiveMenu(items, options = {}, banner = '') {
     const {
-        title = 'Выберите опцию:',
-        exitKey = 'q',
-        enterKey = '\r',
-        onSelect = null,
-        allowEscape = true,
-        clearScreen = true,
-        center = false,
-        boxOptions = {}
+        title         = 'Выберите опцию:',
+        exitKey       = 'q',
+        enterKey      = '\r',
+        onSelect      = null,
+        allowEscape   = true,
+        clearScreen   = true,
+        center        = false,
+        boxOptions    = {}
     } = options;
     
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
         let selectedIndex = 0;
-        while(selectedIndex < items.length && items[selectedIndex].disabled) {
+        while (selectedIndex < items.length && items[selectedIndex].disabled) {
             selectedIndex++;
         }
         
         function render() {
             if (clearScreen) console.clear();
             
-            const menu = drawMenu(items, {
+            const menuText = drawMenu(items, {
                 title,
-                selected: selectedIndex,
+                selected : selectedIndex,
                 ...options,
                 boxOptions
             });
             
-            const instructions = allowEscape ? 
-                `\n${COLORS.DIM}Используйте стрелки для навигации, Enter для выбора, '${exitKey}' для выхода${COLORS.RESET}` :
-                `\n${COLORS.DIM}Используйте стрелки для навигации, Enter для выбора${COLORS.RESET}`;
-                
-            const fullContent = menu + instructions;
+            const instructions = allowEscape
+                ? `\n${COLORS.DIM}Используйте стрелки для навигации, Enter для выбора, '${exitKey}' для выхода${COLORS.RESET}`
+                : `\n${COLORS.DIM}Используйте стрелки для навигации, Enter для выбора${COLORS.RESET}`;
+            
+            const fullMenu = menuText + instructions;
             
             if (center) {
-                console.log(padToScreen(fullContent, { horizontal: 'center', vertical: 'center' }));
+                const content = banner ? banner + '\n' + fullMenu : fullMenu;
+                console.log(padToScreen(content, { horizontal: 'center', vertical: 'center' }));
             } else {
-                console.log(fullContent);
+                if (banner) console.log(banner);
+                console.log(fullMenu);
             }
         }
         
         function handleInput(key) {
             switch (key) {
-                case '\u001b[A':
-                    {
-                        let currentIndex = selectedIndex;
-                        while (currentIndex > 0) {
-                            currentIndex--;
-                            if (!items[currentIndex].disabled) {
-                                selectedIndex = currentIndex;
-                                break;
-                            }
+                case '\u001b[A': {
+                    let idx = selectedIndex;
+                    while (idx > 0) {
+                        idx--;
+                        if (!items[idx].disabled) {
+                            selectedIndex = idx;
+                            break;
                         }
-                        render();
-                        break;
                     }
-                    
-                case '\u001b[B':
-                    {
-                        let currentIndex = selectedIndex;
-                        while (currentIndex < items.length - 1) {
-                            currentIndex++;
-                            if (!items[currentIndex].disabled) {
-                                selectedIndex = currentIndex;
-                                break;
-                            }
+                    render();
+                    break;
+                }
+                case '\u001b[B': {
+                    let idx = selectedIndex;
+                    while (idx < items.length - 1) {
+                        idx++;
+                        if (!items[idx].disabled) {
+                            selectedIndex = idx;
+                            break;
                         }
-                        render();
-                        break;
                     }
-                    
+                    render();
+                    break;
+                }
                 case enterKey:
                     if (!items[selectedIndex].disabled) {
                         disableRawMode();
                         process.stdin.removeListener('data', handleInput);
-                        
-                        if (onSelect) {
-                            onSelect(selectedIndex, items[selectedIndex]);
-                        }
-                        
+                        if (onSelect) onSelect(selectedIndex, items[selectedIndex]);
                         resolve({
-                            index: selectedIndex,
-                            item: items[selectedIndex],
-                            value: typeof items[selectedIndex] === 'string' ? items[selectedIndex] : items[selectedIndex].value || items[selectedIndex].text
+                            index : selectedIndex,
+                            item  : items[selectedIndex],
+                            value : typeof items[selectedIndex] === 'string'
+                                ? items[selectedIndex]
+                                : items[selectedIndex].value || items[selectedIndex].text
                         });
                     }
                     break;
-                    
                 case exitKey:
                     if (allowEscape) {
                         disableRawMode();
@@ -172,34 +167,30 @@ function createInteractiveMenu(items, options = {}) {
                         resolve(null);
                     }
                     break;
-                    
                 case '\u0003':
                     disableRawMode();
                     process.stdin.removeListener('data', handleInput);
                     process.exit(0);
                     break;
-                    
-                default:
+                default: {
                     const num = parseInt(key);
                     if (!isNaN(num) && num >= 1 && num <= items.length) {
-                        const targetIndex = num - 1;
-                        if (!items[targetIndex].disabled) {
-                            selectedIndex = targetIndex;
+                        const target = num - 1;
+                        if (!items[target].disabled) {
+                            selectedIndex = target;
                             disableRawMode();
                             process.stdin.removeListener('data', handleInput);
-                            
-                            if (onSelect) {
-                                onSelect(targetIndex, items[targetIndex]);
-                            }
-                            
+                            if (onSelect) onSelect(target, items[target]);
                             resolve({
-                                index: targetIndex,
-                                item: items[targetIndex],
-                                value: typeof items[targetIndex] === 'string' ? items[targetIndex] : items[targetIndex].value || items[targetIndex].text
+                                index : target,
+                                item  : items[target],
+                                value : typeof items[target] === 'string'
+                                    ? items[target]
+                                    : items[target].value || items[target].text
                             });
                         }
                     }
-                    break;
+                }
             }
         }
         
@@ -209,6 +200,7 @@ function createInteractiveMenu(items, options = {}) {
         render();
     });
 }
+
 
 
 function createSimplePrompt(items, options = {}) {
